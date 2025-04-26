@@ -1,14 +1,23 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { formatDistanceToNow } from 'date-fns';
+import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 
 type User = {
   id: string;
   username: string;
   image: string;
+};
+
+type Comment = {
+  id: string;
+  text: string;
+  createdAt: string;
+  user: User;
 };
 
 type Post = {
@@ -26,32 +35,120 @@ type PostCardProps = {
 };
 
 export default function PostCard({ post }: PostCardProps) {
+  const { data: session, status } = useSession();
+  const router = useRouter();
   const [liked, setLiked] = useState(false);
   const [saved, setSaved] = useState(false);
   const [likesCount, setLikesCount] = useState(post.likesCount);
   const [showComments, setShowComments] = useState(false);
   const [comment, setComment] = useState('');
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [saveLoading, setSaveLoading] = useState(false);
 
-  const handleLike = () => {
-    if (liked) {
-      setLikesCount((prev) => prev - 1);
-    } else {
-      setLikesCount((prev) => prev + 1);
+  useEffect(() => {
+    if (showComments) {
+      fetchComments();
     }
-    setLiked(!liked);
+  }, [showComments, post.id]);
+
+  const fetchComments = async () => {
+    try {
+      const response = await fetch(`/api/posts/comment?postId=${post.id}`);
+      if (response.ok) {
+        const data = await response.json();
+        setComments(data);
+      }
+    } catch (error) {
+      console.error('Error fetching comments:', error);
+    }
   };
 
-  const handleSave = () => {
-    setSaved(!saved);
+  const handleLike = async () => {
+    if (status === 'unauthenticated') {
+      router.push('/auth/signin');
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/posts/like', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ postId: post.id }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setLiked(data.liked);
+        setLikesCount(prev => data.liked ? prev + 1 : prev - 1);
+      }
+    } catch (error) {
+      console.error('Error liking post:', error);
+    }
   };
 
-  const handleSubmitComment = (e: React.FormEvent) => {
+  const handleSave = async () => {
+    if (status === 'unauthenticated') {
+      router.push('/auth/signin');
+      return;
+    }
+    
+    setSaveLoading(true);
+    
+    try {
+      const response = await fetch('/api/posts/save', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ postId: post.id }),
+      });
+
+      if (response.ok) {
+        setSaved(!saved);
+      }
+    } catch (error) {
+      console.error('Error saving post:', error);
+    } finally {
+      setSaveLoading(false);
+    }
+  };
+
+  const handleSubmitComment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (comment.trim() === '') return;
     
-    console.log('Comment submitted:', comment);
-    setComment('');
-    // In a real app, you would send this to an API
+    if (status === 'unauthenticated') {
+      router.push('/auth/signin');
+      return;
+    }
+
+    setLoading(true);
+    
+    try {
+      const response = await fetch('/api/posts/comment', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          postId: post.id,
+          text: comment,
+        }),
+      });
+
+      if (response.ok) {
+        const newComment = await response.json();
+        setComments(prev => [newComment, ...prev]);
+        setComment('');
+      }
+    } catch (error) {
+      console.error('Error posting comment:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const formattedDate = formatDistanceToNow(new Date(post.createdAt), { addSuffix: true });
@@ -115,7 +212,11 @@ export default function PostCard({ post }: PostCardProps) {
               </svg>
             </button>
           </div>
-          <button onClick={handleSave} className="focus:outline-none">
+          <button 
+            onClick={handleSave} 
+            className="focus:outline-none"
+            disabled={saveLoading}
+          >
             {saved ? (
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
                 <path fillRule="evenodd" d="M6.32 2.577a49.255 49.255 0 0 1 11.36 0c1.497.174 2.57 1.46 2.57 2.93V21a.75.75 0 0 1-1.085.67L12 18.089l-7.165 3.583A.75.75 0 0 1 3.75 21V5.507c0-1.47 1.073-2.756 2.57-2.93Z" clipRule="evenodd" />
@@ -143,13 +244,46 @@ export default function PostCard({ post }: PostCardProps) {
           </p>
         </div>
 
+        {/* Comments section */}
+        {showComments && comments.length > 0 && (
+          <div className="mt-2 mb-3">
+            <h4 className="font-medium mb-2">Comments</h4>
+            <div className="space-y-2 max-h-40 overflow-y-auto">
+              {comments.map((comment) => (
+                <div key={comment.id} className="flex items-start gap-2">
+                  <div className="w-6 h-6 rounded-full overflow-hidden flex-shrink-0">
+                    <Image
+                      src={comment.user.image}
+                      alt={comment.user.username}
+                      width={24}
+                      height={24}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <div>
+                    <p>
+                      <Link href={`/profile/${comment.user.username}`} className="font-medium mr-2">
+                        {comment.user.username}
+                      </Link>
+                      {comment.text}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true })}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Comments toggle */}
-        {post.commentsCount > 0 && (
+        {!showComments && post.commentsCount > 0 && (
           <button 
-            onClick={() => setShowComments(!showComments)}
+            onClick={() => setShowComments(true)}
             className="text-gray-500 text-sm mb-2"
           >
-            {showComments ? 'Hide comments' : `View all ${post.commentsCount} comments`}
+            View all {post.commentsCount} comments
           </button>
         )}
 
@@ -169,12 +303,12 @@ export default function PostCard({ post }: PostCardProps) {
           />
           <button 
             type="submit" 
-            disabled={!comment.trim()}
+            disabled={!comment.trim() || loading}
             className={`font-medium ${
-              comment.trim() ? 'text-blue-500' : 'text-blue-300'
+              comment.trim() && !loading ? 'text-blue-500' : 'text-blue-300'
             }`}
           >
-            Post
+            {loading ? 'Posting...' : 'Post'}
           </button>
         </form>
       </div>

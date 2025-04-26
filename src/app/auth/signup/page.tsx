@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 export default function SignUp() {
   const [formData, setFormData] = useState({
@@ -13,6 +14,7 @@ export default function SignUp() {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const router = useRouter();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -31,13 +33,31 @@ export default function SignUp() {
     setLoading(true);
     
     try {
-      // In a real app, this would be connected to an API endpoint
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate network request
-      console.log('Signup data:', formData);
-      // Redirect to signin after successful signup
-      window.location.href = '/auth/signin';
+      const response = await fetch('/api/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: formData.email,
+          username: formData.username,
+          password: formData.password,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.text();
+        throw new Error(errorData || 'Registration failed');
+      }
+
+      // Registration successful, redirect to signin
+      router.push('/auth/signin');
     } catch (err) {
-      setError('Something went wrong. Please try again.');
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('Something went wrong. Please try again.');
+      }
       console.error(err);
     } finally {
       setLoading(false);

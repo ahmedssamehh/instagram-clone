@@ -161,7 +161,7 @@ const config = {
       "value": "prisma-client-js"
     },
     "output": {
-      "value": "C:\\Users\\ahmed\\newq\\instagram-clone\\src\\generated\\prisma",
+      "value": "/Users/ahmedsameh/Documents/GitHub/instagram-clone/src/generated/prisma",
       "fromEnvVar": null
     },
     "config": {
@@ -170,12 +170,12 @@ const config = {
     "binaryTargets": [
       {
         "fromEnvVar": null,
-        "value": "windows",
+        "value": "darwin-arm64",
         "native": true
       }
     ],
     "previewFeatures": [],
-    "sourceFilePath": "C:\\Users\\ahmed\\newq\\instagram-clone\\prisma\\schema.prisma",
+    "sourceFilePath": "/Users/ahmedsameh/Documents/GitHub/instagram-clone/prisma/schema.prisma",
     "isCustomOutput": true
   },
   "relativeEnvPaths": {
@@ -189,7 +189,7 @@ const config = {
     "db"
   ],
   "activeProvider": "sqlite",
-  "postinstall": true,
+  "postinstall": false,
   "inlineDatasources": {
     "db": {
       "url": {

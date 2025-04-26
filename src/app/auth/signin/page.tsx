@@ -2,6 +2,8 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
+import { signIn } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 
 export default function SignIn() {
   const [formData, setFormData] = useState({
@@ -11,6 +13,7 @@ export default function SignIn() {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const router = useRouter();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -23,13 +26,23 @@ export default function SignIn() {
     setLoading(true);
     
     try {
-      // In a real app, this would be connected to an API endpoint
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate network request
-      console.log('Login data:', formData);
-      // Redirect to home/feed after successful login
-      window.location.href = '/feed';
+      const result = await signIn('credentials', {
+        email: formData.email,
+        password: formData.password,
+        redirect: false,
+      });
+
+      if (result?.error) {
+        setError('Invalid email or password');
+        setLoading(false);
+        return;
+      }
+
+      // Success, redirect to feed
+      router.push('/feed');
+      router.refresh();
     } catch (err) {
-      setError('Invalid email or password');
+      setError('Something went wrong. Please try again.');
       console.error(err);
     } finally {
       setLoading(false);
